@@ -1,5 +1,6 @@
 import type { NextPage } from "next";
 import Head from "next/head";
+import Link from "next/link";
 import styles from "../styles/Home.module.css";
 import axios from "../lib/axios";
 
@@ -23,6 +24,7 @@ const Home: NextPage = () => {
 
       <main className={styles.main}>
         <button onClick={testEndpoint}>Test Endpoint</button>
+        <Link href="/">Go to home page</Link>
       </main>
     </div>
   );
