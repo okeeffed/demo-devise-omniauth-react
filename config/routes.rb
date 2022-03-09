@@ -8,5 +8,6 @@ Rails.application.routes.draw do
   resources :users
   resources :home, only: %i[index create]
   resources :session, only: [:index]
+  resources :documents, only: %i[index create update destroy]
   root 'home#index'
 end

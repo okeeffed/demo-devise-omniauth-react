@@ -46,6 +46,7 @@ Update our routes to set our Home controller index to the root route:
 
 ```rb
 Rails.application.routes.draw do
+  devise_for :users
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Defines the root path route ("/")
@@ -92,6 +93,38 @@ Those options could have been added under the `app/models/user.rb` file. We will
 
 ## Part 2: Changing from a Cookie store to using Redis for a session store
 
+Create file for session store init:
+
+```rb
+Rails.application.config.session_store :redis_store,
+                                       servers: ['redis://localhost:6379/0/session'],
+                                       expire_after: 90.minutes,
+                                       key: '_demo_devise_omniauth_react_session'
+```
+
+Start up the app with `bin/dev`.
+
+In another terminal, you can see what is happening with `redis-cli monitor`.
+
+You will get something like this:
+
+```s
+$ redis-cli monitor
+OK
+1646385148.623807 [0 [::1]:49436] "get" "session:2::69618aacfcd4737514bd0d540b73ccc2020b5f98a192c2baa38fda2c7618f8e0"
+1646385148.880797 [0 [::1]:49436] "del" "session:2612c5dbfddbd05a599133f36b8aef68"
+1646385148.883186 [0 [::1]:49436] "del" "session:2::69618aacfcd4737514bd0d540b73ccc2020b5f98a192c2baa38fda2c7618f8e0"
+1646385148.884397 [0 [::1]:49436] "setex" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb" "5400" "\x04\b{\aI\"\x19warden.user.user.key\x06:\x06ET[\a[\x06i\x06I\"\"$2a$12$OVcvnckKRbDKK5UEPZubl.\x06;\x00TI\"\nflash\x06;\x00T{\aI\"\x0cdiscard\x06;\x00T[\x00I\"\x0cflashes\x06;\x00T{\x06I\"\x0bnotice\x06;\x00FI\"\x1cSigned in successfully.\x06;\x00T"
+1646385148.905098 [0 [::1]:49436] "get" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb"
+1646385148.920525 [0 [::1]:49436] "setex" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb" "5400" "\x04\b{\bI\"\x19warden.user.user.key\x06:\x06ET[\a[\x06i\x06I\"\"$2a$12$OVcvnckKRbDKK5UEPZubl.\x06;\x00TI\"\nflash\x06;\x00T{\aI\"\x0cdiscard\x06;\x00T[\x00I\"\x0cflashes\x06;\x00T{\x06I\"\x0bnotice\x06;\x00FI\"\x1cSigned in successfully.\x06;\x00TI\"\x10_csrf_token\x06;\x00FI\"0vS4dc826i_YDuGX6PGKHyHCLQp7fsUw_KiXsMByvdMs\x06;\x00F"
+```
+
+If you reload the page you will still be signed in and you'll notice more requests are made to the `redis-cli monitor` terminal.
+
+One of the benefits of Redis session storage is that you have full control over the session. If you run `redis-cli flushdb` in another terminal and then reload the page, you'll notice that the session has been removed and you'll be redirected to log in once again.
+
+## Part 3: Adding in another Next.js frontend that uses the monolith as an API
+
 Add `rack-cors` gem.
 
 Update the application controller:
@@ -126,15 +159,6 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
 end
 ```
 
-Create file for session store init:
-
-```rb
-Rails.application.config.session_store :redis_store,
-                                       servers: ['redis://localhost:6379/0/session'],
-                                       expire_after: 90.minutes,
-                                       key: '_demo_devise_omniauth_react_session'
-```
-
 Update `config/application.rb`:
 
 ```rb
@@ -166,33 +190,6 @@ end
 ```
 
 That setup will get you ready to be able to enable you to have more capability over ending sessions.
-
-Notes:
-
-Add `rack-cors` gem.
-
-Start up the app with `bin/dev`.
-
-In another terminal, you can see what is happening with `redis-cli monitor`.
-
-You will get something like this:
-
-```s
-$ redis-cli monitor
-OK
-1646385148.623807 [0 [::1]:49436] "get" "session:2::69618aacfcd4737514bd0d540b73ccc2020b5f98a192c2baa38fda2c7618f8e0"
-1646385148.880797 [0 [::1]:49436] "del" "session:2612c5dbfddbd05a599133f36b8aef68"
-1646385148.883186 [0 [::1]:49436] "del" "session:2::69618aacfcd4737514bd0d540b73ccc2020b5f98a192c2baa38fda2c7618f8e0"
-1646385148.884397 [0 [::1]:49436] "setex" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb" "5400" "\x04\b{\aI\"\x19warden.user.user.key\x06:\x06ET[\a[\x06i\x06I\"\"$2a$12$OVcvnckKRbDKK5UEPZubl.\x06;\x00TI\"\nflash\x06;\x00T{\aI\"\x0cdiscard\x06;\x00T[\x00I\"\x0cflashes\x06;\x00T{\x06I\"\x0bnotice\x06;\x00FI\"\x1cSigned in successfully.\x06;\x00T"
-1646385148.905098 [0 [::1]:49436] "get" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb"
-1646385148.920525 [0 [::1]:49436] "setex" "session:2::ecb8e65b0cdda7092604b3b3b66873202cec32d1ca1af8f589eddfde63022cdb" "5400" "\x04\b{\bI\"\x19warden.user.user.key\x06:\x06ET[\a[\x06i\x06I\"\"$2a$12$OVcvnckKRbDKK5UEPZubl.\x06;\x00TI\"\nflash\x06;\x00T{\aI\"\x0cdiscard\x06;\x00T[\x00I\"\x0cflashes\x06;\x00T{\x06I\"\x0bnotice\x06;\x00FI\"\x1cSigned in successfully.\x06;\x00TI\"\x10_csrf_token\x06;\x00FI\"0vS4dc826i_YDuGX6PGKHyHCLQp7fsUw_KiXsMByvdMs\x06;\x00F"
-```
-
-If you reload the page you will still be signed in and you'll notice more requests are made to the `redis-cli monitor` terminal.
-
-One of the benefits of Redis session storage is that you have full control over the session. If you run `redis-cli flushdb` in another terminal and then reload the page, you'll notice that the session has been removed and you'll be redirected to log in once again.
-
-## Part 3: Adding in another Next.js frontend that uses the monolith as an API
 
 ```s
 # Create a new Next.js application
@@ -817,16 +814,453 @@ class Users::SessionsController < Devise::SessionsController
 end
 ```
 
-The docs also take you through adding recaptcha for the password reset page, but we will skip that part for now.
+The docs also take you through adding reCAPTCHA for the password reset page, but we will skip that part for now.
 
 At this point, we can boot the application back up with `bin/dev` and attempt to register a new user at `http://localhost:3000/users/sign_up`.
 
-First, attempt to sign up a user without selecting Recaptcha and you will get a failure message:
+First, attempt to sign up a user without selecting reCAPTCHA and you will get a failure message:
 
 ![TODO]()
 
-Signing up correctly will work as expected after clicking on the Recaptcha form.
+Signing up correctly will work as expected after clicking on the reCAPTCHA form.
 
 Afterwards, you can also sign out and try it on the sign in form:
 
 ![TODO]()
+
+## Part 7: Authorization with Pundit
+
+```s
+# Add the required gems
+$ bundler add pundit
+# We will use rspec-rails to test our controllers and auth
+$ bundler add rspec-rails --group="development,test"
+# We'll use FactoryBot for testing
+$ bundler add factory_bot_rails --group "development,test"
+
+# Setup pundit
+$ bin/rails g pundit:install
+      create  app/policies/application_policy.rb
+
+# Setup RSpec
+$ bin/rails g rspec:install
+
+# Create a document policy file
+$ touch app/policies/document_policy.rb
+
+# Create file for our testing
+$ mkdir -p spec/controllers
+# Create a test file for our spec
+$ touch spec/controllers/documents_controller_spec.rb
+
+# Make User factory
+$ mkdir -p spec/factories
+$ mkdir -p spec/support
+$ touch spec/support/factory_bot.rb
+# Create the user factory
+$ touch spec/factories/user_factory.rb spec/factories/document_factory.rb
+
+# Configuring Devise for RSpec
+$ touch spec/support/controller_macros.rb
+```
+
+Then in the `spec/rails_helper.rb` file, uncomment the line `Dir[Rails.root.join('spec', 'support', '**', '*.rb')].sort.each { |f| require f }`.
+
+At the moment, the User model looks like this:
+
+```rb
+email string ∗ U
+encrypted_password string ∗
+provider string
+remember_created_at datetime (6,0)
+reset_password_sent_at datetime (6,0)
+reset_password_token string
+uid string
+```
+
+We are going to add a relationship between the `User` and a new entity `Document` and there is a many-to-many relationship between them.
+
+We will also add an enum to the `User` type to be either `admin` or `basic`.
+
+In our example, we want one admin user that can create, view, update and delete a document and another basic user that can only view documents.
+
+A quick reference on how we can add an enum can be found [here](https://betterprogramming.pub/how-to-use-enums-in-rails-6-87600e292476).
+
+Follow the steps to add in the migration:
+
+```s
+# Add migration file
+$ bin/rails g migration AddTypeToUsers user_type:integer
+```
+
+Open up the new migration file at `db/migrate/<timestamp>_add_type_to_users.rb` and ensure you add a default of `0` which will be our basic user:
+
+```rb
+class AddTypeToUsers < ActiveRecord::Migration[7.0]
+  def change
+    add_column :users, :user_type, :integer, default: 0
+  end
+end
+```
+
+We can then run a migration to apply this change.
+
+Next, let's update our model for setting the enum in `app/models/user.rb`. At this point, it should look like the following:
+
+```rb
+class User < ApplicationRecord
+  enum user_type: {
+    basic: 0,
+    admin: 1
+  }
+
+  # Include default devise modules. Others available are:
+  # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
+  devise :database_authenticatable, :registerable,
+         :recoverable, :rememberable, :validatable, :omniauthable, omniauth_providers: %i[github]
+
+  def self.from_omniauth(auth)
+    where(provider: auth.provider, uid: auth.uid).first_or_create do |user|
+      user.email = auth.info.email
+      user.password = Devise.friendly_token[0, 20]
+      # user.name = auth.info.name   # assuming the user model has a name
+      # user.image = auth.info.image # assuming the user model has an image
+      # If you are using confirmable and the provider(s) you use validate emails,
+      # uncomment the line below to skip the confirmation emails.
+      # user.skip_confirmation!
+    end
+  end
+end
+```
+
+Ruby will automatically give us some helper methods for this model now so that we can run methods like `user.basic?` and `user.admin?` to check the user type.
+
+We can also assign types with `user.basic!` and `user.admin!`.
+
+At this point, we can now generate our `Document` model.
+
+```s
+# Create the document controller with the view
+$ bin/rails g controller documents index create update destroy --skip-template-engine
+       create  app/controllers/documents_controller.rb
+      invoke  test_unit
+       create    test/controllers/documents_controller_test.rb
+      invoke  helper
+   identical    app/helpers/documents_helper.rb
+      invoke    test_unit
+
+# Generate our model
+$ bin/rails g model Document body:string
+      invoke  active_record
+      create    db/migrate/20220309000731_create_documents.rb
+      create    app/models/document.rb
+      invoke    test_unit
+      create      test/models/document_test.rb
+      create      test/fixtures/documents.yml
+
+# Migrate the new model
+$ bin/rails db:migrate
+```
+
+We also need to create a many-to-many relationship for our users and documents:
+
+```s
+$ bin/rails g migration CreateJoinTableUsersDocuments users documents
+```
+
+We need to update both the Document and User models.
+
+For Documents, it should now look like this:
+
+```rb
+class Document < ApplicationRecord
+  has_and_belongs_to_many :users
+end
+```
+
+For Users:
+
+```rb
+class User < ApplicationRecord
+  enum type: {
+    basic: 0,
+    admin: 1
+  }
+  has_and_belongs_to_many :documents
+
+  # Include default devise modules. Others available are:
+  # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
+  devise :database_authenticatable, :registerable,
+         :recoverable, :rememberable, :validatable, :omniauthable, omniauth_providers: %i[github]
+
+  def self.from_omniauth(auth)
+    where(provider: auth.provider, uid: auth.uid).first_or_create do |user|
+      user.email = auth.info.email
+      user.password = Devise.friendly_token[0, 20]
+      # user.name = auth.info.name   # assuming the user model has a name
+      # user.image = auth.info.image # assuming the user model has an image
+      # If you are using confirmable and the provider(s) you use validate emails,
+      # uncomment the line below to skip the confirmation emails.
+      # user.skip_confirmation!
+    end
+  end
+end
+```
+
+Next, we need to update the `config/routes.rb` file for our new document endpoints:
+
+```rb
+Rails.application.routes.draw do
+  devise_for :users,
+             controllers: { omniauth_callbacks: 'users/omniauth_callbacks', sessions: 'users/sessions',
+                            registrations: 'users/registrations' }
+  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+
+  # Defines the root path route ("/")
+  resources :users
+  resources :home, only: %i[index create]
+  resources :session, only: [:index]
+  # ADD HERE
+  resources :documents, only: %i[index create update destroy]
+  root 'home#index'
+end
+```
+
+Let's now run the migrations again:
+
+```s
+# Run migration
+$ bin/rails db:migrate
+```
+
+At this point, we can now use Pundit to set some policies.
+
+### Creating our document policy
+
+First, update `app/policies/application_policy.rb`:
+
+```rb
+# frozen_string_literal: true
+
+class ApplicationPolicy
+  include Pundit::Authorization
+end
+```
+
+Next in `app/policies/document_policy.rb`:
+
+```rb
+class DocumentPolicy < ApplicationPolicy
+  attr_reader :user, :document
+
+  def initialize(user, document)
+    @user = user
+    @document = document
+  end
+
+  def create?
+    user.admin?
+  end
+
+  def update?
+    user.admin?
+  end
+
+  def destroy?
+    user.admin?
+  end
+end
+```
+
+### Updating the documents controller
+
+Then we need to setup the documents controller.
+
+Note that we can use the `authorize` method to check our policy control.
+
+```rb
+class DocumentsController < ApplicationController
+  include Pundit
+
+  def create
+    @doc = Document.new(body: params[:body])
+    authorize @doc, :create?
+    @doc.save!
+
+    render json: @doc, status: :created
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  def index
+    @docs = Document.all
+    render json: @docs
+  end
+
+  def update
+    @doc = Document.find(params[:id])
+    authorize @doc, :update?
+    @doc.update!(document_params)
+    render json: @doc
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  def destroy
+    @doc = Document.find(params[:id])
+    authorize @doc, :destroy?
+    @doc.destroy
+    render status: :no_content
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  private
+
+  # Using a private method to encapsulate the permissible parameters
+  # is just a good pattern since you'll be able to reuse the same
+  # permit list between create and update. Also, you can specialize
+  # this method with per-user checking of permissible attributes.
+  def document_params
+    params.require(:document).permit(:body)
+  end
+end
+```
+
+We can demonstrate our policies at work from the Rails console using our tests.
+
+### Testing files
+
+In he `spec/rails_helper.rb` file, let's update the file to ensure that the spec support files are required and that we add in the helpers for both `Devise::Test::ControllerHelpers` and a `ControllerMacros` support file that we will fill out after.
+
+The code for the file should end up like so:
+
+```rb
+# This file is copied to spec/ when you run 'rails generate rspec:install'
+require 'spec_helper'
+ENV['RAILS_ENV'] ||= 'test'
+require_relative '../config/environment'
+# Prevent database truncation if the environment is production
+abort('The Rails environment is running in production mode!') if Rails.env.production?
+require 'rspec/rails'
+
+Dir[Rails.root.join('spec', 'support', '**', '*.rb')].sort.each { |f| require f }
+
+# Checks for pending migrations and applies them before tests are run.
+# If you are not using ActiveRecord, you can remove these lines.
+begin
+  ActiveRecord::Migration.maintain_test_schema!
+rescue ActiveRecord::PendingMigrationError => e
+  puts e.to_s.strip
+  exit 1
+end
+RSpec.configure do |config|
+  # Previous code omitted for brevity ...
+
+  config.include Devise::Test::ControllerHelpers, type: :controller
+  config.extend ControllerMacros, type: :controller
+end
+```
+
+I have omitted some of the config.
+
+We now need to add in some of factories and support files.
+
+For `spec/factories/document_factory.rb`:
+
+```rb
+FactoryBot.define do
+  factory :document do
+    body { 'Hello, world' }
+  end
+end
+```
+
+For `spec/factories/user_factory.rb`:
+
+```rb
+FactoryBot.define do
+  factory :user do
+    id { 2 }
+    email { 'hello@example.com' }
+    password { 'password123' }
+  end
+
+  trait :admin do
+    user_type { 'admin' }
+  end
+end
+```
+
+For `spec/support/controller_macros.rb`:
+
+```rb
+module ControllerMacros
+  def login_user
+    # Before each test, create and login the user
+    before(:each) do
+      @request.env['devise.mapping'] = Devise.mappings[:user]
+      sign_in FactoryBot.create(:user)
+    end
+  end
+
+  def login_admin
+    before(:each) do
+      @request.env['devise.mapping'] = Devise.mappings[:admin]
+      sign_in FactoryBot.create(:user, :admin) # Using factory bot as an example
+    end
+  end
+end
+```
+
+These helper methods simply sign in a basic user or admin.
+
+For the `spec/support/factory_bot.rb` file:
+
+```rb
+RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
+end
+```
+
+At this point, we can write a test for our DocumentsController.
+
+For now, we will just test our create method.
+
+In `spec/controllers/documents_controller_spec.rb`:
+
+```rb
+require 'rails_helper'
+
+RSpec.describe DocumentsController, type: :controller do
+  describe 'GET #index' do
+    let(:subject) { build(:document) }
+
+    context 'successful responses' do
+      login_admin
+      it 'creates a post when user is authorized' do
+        post :create, params: { body: subject.body }
+
+        expect(response.status).to eq(201)
+        expect(response.parsed_body['body']).to eq(subject.body)
+      end
+    end
+
+    context 'unsuccessful responses' do
+      login_user
+      it 'returns unauthorized when user is unauthorized to create a document' do
+        post :create, params: { body: subject.body }
+
+        expect(response.status).to eq(401)
+      end
+    end
+  end
+end
+```
+
+In the tests:
+
+- For successful requests, we use our `login_admin` helper to log in the admin user type.
+- To test the unauthorized response, we log in a basic use with `login_user`.
+
+- [RESOURCE](https://www.matthewhoelter.com/2019/09/12/setting-up-and-testing-rails-6.0-with-rspec-factorybot-and-devise.html)

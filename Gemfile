@@ -87,3 +87,11 @@ gem "omniauth-rails_csrf_protection", "~> 1.0"
 gem 'omniauth-github', github: 'omniauth/omniauth-github', branch: 'master'
 
 gem "recaptcha", "~> 5.8"
+
+gem "pundit", "~> 2.2"
+
+gem "rails-erd", "~> 1.6", :group => :development
+
+gem "rspec-rails", "~> 5.1", :groups => [:development, :test]
+
+gem "factory_bot_rails", "~> 6.2", :groups => [:development, :test]
