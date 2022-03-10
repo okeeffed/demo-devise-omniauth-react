@@ -7,7 +7,12 @@ import axios from "../lib/axios";
 const Home: NextPage = () => {
   const testEndpoint = async () => {
     try {
-      const { data } = await axios.post("http://localhost:3000/home");
+      const { data } = await axios.get("http://localhost:3000/api/v1/example", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: localStorage.getItem("token") ?? "",
+        },
+      });
       console.log(data);
     } catch (e) {
       console.error(e);

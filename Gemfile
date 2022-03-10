@@ -81,7 +81,6 @@ gem "tailwindcss-rails", "~> 2.0"
 
 gem "dotenv-rails", "~> 2.7", require: 'dotenv/rails-now', :groups => [:development, :test]
 
-
 gem "omniauth-rails_csrf_protection", "~> 1.0"
 
 gem 'omniauth-github', github: 'omniauth/omniauth-github', branch: 'master'
@@ -95,3 +94,5 @@ gem "rails-erd", "~> 1.6", :group => :development
 gem "rspec-rails", "~> 5.1", :groups => [:development, :test]
 
 gem "factory_bot_rails", "~> 6.2", :groups => [:development, :test]
+
+gem "devise-jwt", "~> 0.9.0"

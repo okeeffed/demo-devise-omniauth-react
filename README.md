@@ -868,6 +868,8 @@ Then in the `spec/rails_helper.rb` file, uncomment the line `Dir[Rails.root.join
 
 At the moment, the User model looks like this:
 
+---
+
 ```rb
 email string ∗ U
 encrypted_password string ∗
@@ -903,7 +905,12 @@ class AddTypeToUsers < ActiveRecord::Migration[7.0]
 end
 ```
 
-We can then run a migration to apply this change.
+We can then run a migration to apply this change using `bin/rails db:migrate`.
+
+```s
+# Migrate document model and many-to-many relationship with users
+bin/rails db:migrate
+```
 
 Next, let's update our model for setting the enum in `app/models/user.rb`. At this point, it should look like the following:
 
@@ -941,7 +948,7 @@ At this point, we can now generate our `Document` model.
 
 ```s
 # Create the document controller with the view
-$ bin/rails g controller documents index create update destroy --skip-template-engine
+$ bin/rails g controller documents --skip-template-engine
        create  app/controllers/documents_controller.rb
       invoke  test_unit
        create    test/controllers/documents_controller_test.rb
@@ -1080,7 +1087,7 @@ Note that we can use the `authorize` method to check our policy control.
 
 ```rb
 class DocumentsController < ApplicationController
-  include Pundit
+  include Pundit::Authorization
 
   def create
     @doc = Document.new(body: params[:body])
@@ -1264,3 +1271,127 @@ In the tests:
 - To test the unauthorized response, we log in a basic use with `login_user`.
 
 - [RESOURCE](https://www.matthewhoelter.com/2019/09/12/setting-up-and-testing-rails-6.0-with-rspec-factorybot-and-devise.html)
+
+## Part 9: Unauthorized Devise response
+
+- [StackOverflow](https://stackoverflow.com/questions/55032668/devise-how-to-return-401-unauthorized-without-redirect-if-user-is-not-signed-in)
+- [Redirect to specific page docs](https://github.com/heartcombo/devise/wiki/How-To:-Redirect-to-a-specific-page-when-the-user-can-not-be-authenticated)
+
+```s
+# Create a helper
+$ mkdir lib/helpers
+$ touch lib/helpers/devise_failure_app.rb
+```
+
+Inside of `config/initializers/devise.rb`, we need to update the `config.warden` manager for the `failure_app`:
+
+```rb
+# frozen_string_literal: true
+require_relative '../../lib/helpers/devise_failure_app'
+
+# ... rest omitted ...
+
+Devise.setup do |config|
+  # ... rest omitted ...
+
+  # ==> Warden configuration
+  # If you want to use other strategies, that are not supported by Devise, or
+  # change the failure app, you can configure them inside the config.warden block.
+  #
+  config.warden do |manager|
+    # manager.intercept_401 = false
+    # manager.default_strategies(scope: :user).unshift :some_external_strategy
+    manager.failure_app = Helpers::DeviseFailureApp
+  end
+end
+```
+
+Finally, update the `config/routes.rb` file to that the documents controller is actually under the `api` namespace:
+
+```rb
+Rails.application.routes.draw do
+  devise_for :users,
+             controllers: { omniauth_callbacks: 'users/omniauth_callbacks', sessions: 'users/sessions',
+                            registrations: 'users/registrations' }
+  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+  namespace :api do
+    namespace :v1 do
+      resources :documents, only: %i[index create update destroy]
+    end
+  end
+
+  # Defines the root path route ("/")
+  resources :users
+  resources :home, only: %i[index create]
+  resources :session, only: [:index]
+  root 'home#index'
+end
+```
+
+Finally, move `app/controllers/documents_controller.rb` to `app/controllers/api/v1/documents_controller.rb` and update the class:
+
+```rb
+class Api::V1::DocumentsController < ApplicationController
+  include Pundit
+
+  def create
+    @doc = Document.new(body: params[:body])
+    authorize @doc, :create?
+    @doc.save!
+
+    render json: @doc, status: :created
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  def index
+    @docs = Document.all
+    render json: @docs
+  end
+
+  def update
+    @doc = Document.find(params[:id])
+    authorize @doc, :update?
+    @doc.update!(document_params)
+    render json: @doc
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  def destroy
+    @doc = Document.find(params[:id])
+    authorize @doc, :destroy?
+    @doc.destroy
+    render status: :no_content
+  rescue Pundit::NotAuthorizedError
+    render json: { error: 'You are not authorized to create a document' }, status: :unauthorized
+  end
+
+  private
+
+  # Using a private method to encapsulate the permissible parameters
+  # is just a good pattern since you'll be able to reuse the same
+  # permit list between create and update. Also, you can specialize
+  # this method with per-user checking of permissible attributes.
+  def document_params
+    params.require(:document).permit(:body)
+  end
+end
+```
+
+Running in the controller:
+
+```s
+$ http GET localhost:3000/api/v1/documents
+HTTP/1.1 401 Unauthorized
+
+# ... omitted
+
+You need to sign in or sign up before continuing.
+
+$ http GET localhost:3000/home --header
+HTTP/1.1 302 Found
+Cache-Control: no-cache
+Content-Type: text/html; charset=utf-8
+Location: http://localhost:3000/users/sign_in
+```

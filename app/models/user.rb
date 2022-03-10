@@ -7,8 +7,9 @@ class User < ApplicationRecord
 
   # Include default devise modules. Others available are:
   # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
-  devise :database_authenticatable, :registerable,
-         :recoverable, :rememberable, :validatable, :omniauthable, omniauth_providers: %i[github]
+  devise :database_authenticatable, :registerable, :recoverable, :rememberable, :validatable, :omniauthable,
+         :jwt_authenticatable, omniauth_providers: ['github'],
+                               jwt_revocation_strategy: Devise::JWT::RevocationStrategies::Null
 
   def self.from_omniauth(auth)
     where(provider: auth.provider, uid: auth.uid).first_or_create do |user|

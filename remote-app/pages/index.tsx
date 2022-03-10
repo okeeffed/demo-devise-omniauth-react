@@ -15,20 +15,28 @@ const Home: NextPage = () => {
       password: { value: string };
     };
 
-    const { data } = await axios.post("http://localhost:3000/users/sign_in", {
-      user: {
-        email: target.email.value,
-        password: target.password.value,
-        remember_me: 0,
-      },
-    });
+    const { headers } = await axios.post(
+      "http://localhost:3000/users/sign_in",
+      {
+        user: {
+          email: target.email.value,
+          password: target.password.value,
+          remember_me: 0,
+        },
+      }
+    );
 
-    console.log(data);
+    localStorage.setItem("token", headers["authorization"]);
   };
 
   const testEndpoint = async () => {
     try {
-      const { data } = await axios.post("http://localhost:3000/home");
+      const { data } = await axios.get("http://localhost:3000/api/v1/example", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: localStorage.getItem("token") ?? "",
+        },
+      });
       console.log(data);
     } catch (e) {
       console.error(e);

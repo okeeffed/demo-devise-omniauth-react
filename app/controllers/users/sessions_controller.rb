@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class Users::SessionsController < Devise::SessionsController
-  prepend_before_action :check_captcha, only: [:create] # Change this to be any actions you want to protect.
+  # prepend_before_action :check_captcha, only: [:create] # Change this to be any actions you want to protect.
+  skip_forgery_protection
 
   private
 
@@ -38,4 +39,11 @@ class Users::SessionsController < Devise::SessionsController
   # def configure_sign_in_params
   #   devise_parameter_sanitizer.permit(:sign_in, keys: [:attribute])
   # end
+
+  def respond_with(resource, _opts = {})
+    render json: {
+      status: { code: 200, message: 'Logged in sucessfully.' },
+      data: resource.as_json(only: %i[id email name role created_at updated_at])
+    }, status: :ok
+  end
 end
